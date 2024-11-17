@@ -1,0 +1,90 @@
+from typing import Dict, Optional
+import sys
+from colorama import init, Fore, Style
+from llm_generator import LLMQuestionGenerator
+from progress_tracker import ProgressTracker
+
+# Initialize colorama for Windows support
+init()
+
+class SpanishTrainer:
+    def __init__(self):
+        self.levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
+        self.user_id = None
+        self.progress_tracker = None
+        self.llm_generator = None
+
+    def initialize_user(self):
+        """Initialize user session"""
+        print("\nWelcome to Spanish Trainer!")
+        print("""Choose your level:
+        1. A1 (Beginner)
+        2. A2 (Elementary)
+        3. B1 (Intermediate)
+        4. B2 (Upper Intermediate)
+        5. C1 (Advanced)
+        6. C2 (Proficient)
+        """)
+        
+        while True:
+            choice = input("Enter your level (1-6): ").strip()
+            if choice in ['1', '2', '3', '4', '5', '6']:
+                self.user_id = f"user_{random.randint(1000, 9999)}"
+                self.progress_tracker = ProgressTracker(self.user_id)
+                self.llm_generator = LLMQuestionGenerator(self.levels[int(choice) - 1])
+                break
+            print("Please enter a number between 1 and 6.")
+
+    def run_quiz(self):
+        """Run the Spanish quiz"""
+        print("\nStarting the quiz...")
+        print("Type 'quit' at any time to exit.")
+
+        while True:
+            # Generate question using LLM
+            question, correct_answer = self.llm_generator.generate_question()
+
+            print(f"\n{Fore.CYAN}{question}{Style.RESET_ALL}")
+            user_answer = input("Your answer: ").strip()
+
+            if user_answer.lower() == 'quit':
+                break
+
+            is_correct = self.llm_generator.validate_answer(user_answer, correct_answer)
+            
+            if is_correct:
+                print(f"{Fore.GREEN}Correct!{Style.RESET_ALL}")
+                if question_type == 'vocabulary':
+                    self.progress_tracker.track_vocabulary(user_answer, True)
+                elif question_type == 'conjugation':
+                    self.progress_tracker.track_verb(user_answer, True)
+            else:
+                print(f"{Fore.RED}Incorrect.{Style.RESET_ALL} The correct answer was: {correct_answer}")
+                if question_type == 'vocabulary':
+                    self.progress_tracker.track_vocabulary(user_answer, False)
+                elif question_type == 'conjugation':
+                    self.progress_tracker.track_verb(user_answer, False)
+
+            self.progress_tracker.update_score(is_correct)
+
+    def show_statistics(self):
+        """Show user statistics"""
+        stats = self.progress_tracker.get_statistics()
+        print("\nQuiz Statistics:")
+        print(f"Total Questions: {stats['total']}")
+        print(f"Accuracy: {stats['accuracy']:.1f}%")
+
+    def run(self):
+        """Run the main program"""
+        try:
+            self.initialize_user()
+            self.run_quiz()
+            self.show_statistics()
+        except KeyboardInterrupt:
+            print("\nGoodbye!")
+        except Exception as e:
+            print(f"An error occurred: {str(e)}")
+
+if __name__ == "__main__":
+    trainer = SpanishTrainer()
+    trainer.run()
