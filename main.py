@@ -3,6 +3,7 @@ import sys
 from colorama import init, Fore, Style
 from llm_generator import LLMQuestionGenerator
 from progress_tracker import ProgressTracker
+import random
 
 # Initialize colorama for Windows support
 init()
@@ -31,35 +32,87 @@ class SpanishTrainer:
             if choice in ['1', '2', '3', '4', '5', '6']:
                 self.user_id = f"user_{random.randint(1000, 9999)}"
                 self.progress_tracker = ProgressTracker(self.user_id)
+                stats = self.progress_tracker.get_statistics()
+                print(f"\nYour current progress:")
+                print(f"Overall accuracy: {stats['accuracy']:.1f}%")
+                print(f"Total questions answered: {stats['total']}")
+                print(f"Items needing review: {stats['review_items']}")
+                print("\nStarting new session...")
+                self.progress_tracker.current_session['start_time'] = datetime.now().isoformat()
                 self.llm_generator = LLMQuestionGenerator(self.levels[int(choice) - 1])
                 break
+            print("Please enter a number between 1 and 6.")
             print("Please enter a number between 1 and 6.")
 
     def run_quiz(self):
         """Run the Spanish quiz"""
         print("\nStarting the quiz...")
         print("Type 'quit' at any time to exit.")
+        print("Type 'stats' to view your progress")
+        print("Type 'review' to practice difficult items")
 
         while True:
             # Generate question using LLM
-            question, correct_answer = self.llm_generator.generate_question()
+            question, correct_answer, difficulty, explanation, question_type = self.llm_generator.generate_question()
+            
+            # Display question with color coding
+            print(f"\n{Fore.CYAN}{question}{Style.RESET_ALL}")
+            print(f"Difficulty: {Fore.YELLOW}{difficulty}{Style.RESET_ALL}")
+            print(f"Explanation: {Fore.GREEN}{explanation}{Style.RESET_ALL}")
+            
+            user_answer = input("Your answer: ").strip().lower()
+            
+            if user_answer == 'quit':
+                self.progress_tracker.current_session['end_time'] = datetime.now().isoformat()
+                self.progress_tracker._save_progress()
+                print("\nSession ended.")
+                break
+            
+            if user_answer == 'stats':
+                stats = self.progress_tracker.get_statistics()
+                print("\nYour Progress:")
+                print(f"Overall accuracy: {stats['accuracy']:.1f}%")
+                print(f"Total questions answered: {stats['total']}")
+                print(f"Items needing review: {stats['review_items']}")
+                continue
+            
+            if user_answer == 'review':
+                self._run_review_session()
+                continue
+            
+            # Validate answer
+            is_correct, feedback = self.llm_generator.validate_answer(user_answer, correct_answer)
+            
+            # Update progress
+            self.progress_tracker.update_score(is_correct, question_type, question)
+            
+            # Display feedback
+            if is_correct:
+                print(f"{Fore.GREEN}Correct!{Style.RESET_ALL}")
+            else:
+                print(f"{Fore.RED}Incorrect.{Style.RESET_ALL} {correct_answer}")
+            print(f"Feedback: {feedback}")
 
             print(f"\n{Fore.CYAN}{question}{Style.RESET_ALL}")
+            print(f"Difficulty: {difficulty}")
+            print(f"Explanation: {explanation}")
             user_answer = input("Your answer: ").strip()
 
             if user_answer.lower() == 'quit':
                 break
 
-            is_correct = self.llm_generator.validate_answer(user_answer, correct_answer)
+            is_correct, feedback = self.llm_generator.validate_answer(user_answer, correct_answer)
             
             if is_correct:
                 print(f"{Fore.GREEN}Correct!{Style.RESET_ALL}")
+                print(f"{feedback}")
                 if question_type == 'vocabulary':
                     self.progress_tracker.track_vocabulary(user_answer, True)
                 elif question_type == 'conjugation':
                     self.progress_tracker.track_verb(user_answer, True)
             else:
-                print(f"{Fore.RED}Incorrect.{Style.RESET_ALL} The correct answer was: {correct_answer}")
+                print(f"{Fore.RED}Incorrect.{Style.RESET_ALL}")
+                print(f"{feedback}")
                 if question_type == 'vocabulary':
                     self.progress_tracker.track_vocabulary(user_answer, False)
                 elif question_type == 'conjugation':
