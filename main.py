@@ -3,6 +3,7 @@ import sys
 from colorama import init, Fore, Style
 from llm_generator import LLMQuestionGenerator
 from progress_tracker import ProgressTracker
+from spaced_repetition import SpacedRepetitionSystem
 import random
 
 # Initialize colorama for Windows support
@@ -32,6 +33,7 @@ class SpanishTrainer:
             if choice in ['1', '2', '3', '4', '5', '6']:
                 self.user_id = f"user_{random.randint(1000, 9999)}"
                 self.progress_tracker = ProgressTracker(self.user_id)
+                self.spaced_repetition = SpacedRepetitionSystem(self.user_id)
                 stats = self.progress_tracker.get_statistics()
                 print(f"\nYour current progress:")
                 print(f"Overall accuracy: {stats['accuracy']:.1f}%")
@@ -52,7 +54,45 @@ class SpanishTrainer:
         print("Type 'review' to practice difficult items")
 
         while True:
-            # Generate question using LLM
+            # Check for items that need review
+            review_items = self.spaced_repetition.get_review_items()
+            
+            if review_items:
+                print(f"\n{Fore.YELLOW}Review time! ({len(review_items)} items to review){Style.RESET_ALL}")
+                for review_item in review_items:
+                    item = review_item['item']
+                    print(f"\n{Fore.CYAN}{item['content']}{Style.RESET_ALL}")
+                    print(f"Type: {item['type']}")
+                    print(f"Difficulty: {item['difficulty']}")
+                    
+                    user_answer = input("Your answer: ").strip().lower()
+                    
+                    if user_answer == 'quit':
+                        self.progress_tracker.current_session['end_time'] = datetime.now().isoformat()
+                        self.progress_tracker._save_progress()
+                        print("\nSession ended.")
+                        break
+                    
+                    # Validate answer
+                    is_correct, feedback = self.llm_generator.validate_answer(user_answer, item['correct_answer'])
+                    
+                    # Update spaced repetition
+                    self.spaced_repetition.update_item(item, is_correct)
+                    
+                    # Display feedback
+                    if is_correct:
+                        print(f"{Fore.GREEN}Correct!{Style.RESET_ALL}")
+                        print(f"Moving to box {item['box']}")
+                    else:
+                        print(f"{Fore.RED}Incorrect.{Style.RESET_ALL} {item['correct_answer']}")
+                        print(f"Moving to box 1")
+                    print(f"Feedback: {feedback}")
+                
+                # Continue with regular questions
+                if user_answer == 'quit':
+                    break
+
+            # Generate new question using LLM
             question, correct_answer, difficulty, explanation, question_type = self.llm_generator.generate_question()
             
             # Display question with color coding
@@ -82,6 +122,15 @@ class SpanishTrainer:
             
             # Validate answer
             is_correct, feedback = self.llm_generator.validate_answer(user_answer, correct_answer)
+            
+            # Update spaced repetition
+            self.spaced_repetition.add_item({
+                'content': question,
+                'type': question_type,
+                'difficulty': difficulty,
+                'correct_answer': correct_answer,
+                'explanation': explanation
+            })
             
             # Update progress
             self.progress_tracker.update_score(is_correct, question_type, question)
