@@ -35,10 +35,16 @@ class SpanishTrainer:
                 self.progress_tracker = ProgressTracker(self.user_id)
                 self.spaced_repetition = SpacedRepetitionSystem(self.user_id)
                 stats = self.progress_tracker.get_statistics()
-                print(f"\nYour current progress:")
+                print("\nYour current progress:")
                 print(f"Overall accuracy: {stats['accuracy']:.1f}%")
                 print(f"Total questions answered: {stats['total']}")
                 print(f"Items needing review: {stats['review_items']}")
+                
+                # Show review settings
+                review_stats = self.spaced_repetition.get_statistics()
+                print("\nReview Settings:")
+                print(f"Review priority: {review_stats['review_settings']['review_priority']}")
+                print(f"Max review items: {review_stats['review_settings']['max_review_items']}")
                 print("\nStarting new session...")
                 self.progress_tracker.current_session['start_time'] = datetime.now().isoformat()
                 self.llm_generator = LLMQuestionGenerator(self.levels[int(choice) - 1])
@@ -49,9 +55,18 @@ class SpanishTrainer:
     def run_quiz(self):
         """Run the Spanish quiz"""
         print("\nStarting the quiz...")
+        print("Available commands:")
+        print("  'quit' - End the session")
+        print("  'stats' - View progress")
+        print("  'review' - Practice difficult items")
+        print("  'settings' - Adjust review settings")
+        print("  'analytics' - View detailed statistics")
+        print("\nType your answer or command:")
         print("Type 'quit' at any time to exit.")
         print("Type 'stats' to view your progress")
         print("Type 'review' to practice difficult items")
+        print("Type 'settings' to adjust review settings")
+        print("Type 'analytics' to view detailed statistics")
 
         while True:
             # Check for items that need review
@@ -114,6 +129,14 @@ class SpanishTrainer:
                 print(f"Overall accuracy: {stats['accuracy']:.1f}%")
                 print(f"Total questions answered: {stats['total']}")
                 print(f"Items needing review: {stats['review_items']}")
+                continue
+
+            if user_answer == 'settings':
+                self._show_review_settings()
+                continue
+
+            if user_answer == 'analytics':
+                self._show_detailed_analytics()
                 continue
             
             if user_answer == 'review':
